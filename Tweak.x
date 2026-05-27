@@ -642,10 +642,16 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
                 NSLog(@"[XHSHelper] 准备发送评论自动回复: %@", gCommentAutoReplyText);
                 
                 if ([self respondsToSelector:@selector(replyComment:withContent:completion:)]) {
-                    [self performSelector:@selector(replyComment:withContent:completion:) 
-                              withObject:comment 
-                              withObject:gCommentAutoReplyText 
-                              withObject:nil];
+                    SEL selector = @selector(replyComment:withContent:completion:);
+                    NSMethodSignature *signature = [self methodSignatureForSelector:selector];
+                    NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
+                    [invocation setTarget:self];
+                    [invocation setSelector:selector];
+                    [invocation setArgument:&comment atIndex:2];
+                    [invocation setArgument:&gCommentAutoReplyText atIndex:3];
+                    id nilArg = nil;
+                    [invocation setArgument:&nilArg atIndex:4];
+                    [invocation invoke];
                 }
             });
         }
