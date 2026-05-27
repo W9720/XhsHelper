@@ -664,6 +664,9 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
 
 @end
 
+// 保存原始方法实现，避免递归
+static IMP originalFontWithNameIMP = NULL;
+
 // 自定义字体Hook
 @interface UIFont_CustomFont : NSObject
 @end
@@ -674,6 +677,13 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         Class cls = [UIFont class];
+        
+        // 保存原始 fontWithName:size: 的实现
+        SEL originalSelector3 = @selector(fontWithName:size:);
+        Method originalMethod3 = class_getClassMethod(cls, originalSelector3);
+        if (originalMethod3) {
+            originalFontWithNameIMP = method_getImplementation(originalMethod3);
+        }
         
         // Hook systemFontOfSize:
         SEL originalSelector1 = @selector(systemFontOfSize:);
@@ -700,10 +710,7 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
         }
         
         // Hook fontWithName:size:
-        SEL originalSelector3 = @selector(fontWithName:size:);
         SEL swizzledSelector3 = @selector(xhshelper_fontWithName:size:);
-        
-        Method originalMethod3 = class_getClassMethod(cls, originalSelector3);
         Method swizzledMethod3 = class_getClassMethod([self class], swizzledSelector3);
         
         if (originalMethod3 && swizzledMethod3) {
@@ -714,8 +721,9 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
 }
 
 + (UIFont *)xhshelper_systemFontOfSize:(CGFloat)size {
-    if (gCustomFontEnabled && gCustomFontName.length > 0) {
-        UIFont *customFont = [UIFont fontWithName:gCustomFontName size:size];
+    if (gCustomFontEnabled && gCustomFontName.length > 0 && originalFontWithNameIMP) {
+        // 使用保存的原始方法获取字体，避免递归
+        UIFont *customFont = ((UIFont *(*)(id, SEL, NSString *, CGFloat))originalFontWithNameIMP)([UIFont class], @selector(fontWithName:size:), gCustomFontName, size);
         if (customFont) {
             return customFont;
         }
@@ -724,8 +732,8 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
 }
 
 + (UIFont *)xhshelper_systemFontOfSize:(CGFloat)size weight:(UIFontWeight)weight {
-    if (gCustomFontEnabled && gCustomFontName.length > 0) {
-        UIFont *customFont = [UIFont fontWithName:gCustomFontName size:size];
+    if (gCustomFontEnabled && gCustomFontName.length > 0 && originalFontWithNameIMP) {
+        UIFont *customFont = ((UIFont *(*)(id, SEL, NSString *, CGFloat))originalFontWithNameIMP)([UIFont class], @selector(fontWithName:size:), gCustomFontName, size);
         if (customFont) {
             return customFont;
         }
@@ -734,8 +742,8 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
 }
 
 + (UIFont *)xhshelper_fontWithName:(NSString *)fontName size:(CGFloat)size {
-    if (gCustomFontEnabled && gCustomFontName.length > 0) {
-        UIFont *customFont = [UIFont fontWithName:gCustomFontName size:size];
+    if (gCustomFontEnabled && gCustomFontName.length > 0 && originalFontWithNameIMP) {
+        UIFont *customFont = ((UIFont *(*)(id, SEL, NSString *, CGFloat))originalFontWithNameIMP)([UIFont class], @selector(fontWithName:size:), gCustomFontName, size);
         if (customFont) {
             return customFont;
         }
