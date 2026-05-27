@@ -1,5 +1,6 @@
 #import "XHSHelperViewController.h"
-
+#import <CoreText/CoreText.h>
+#import <MobileCoreServices/MobileCoreServices.h>
 
 BOOL gWatermarkEnabled = YES;
 BOOL gSaveEnabled = YES;
@@ -17,7 +18,7 @@ BOOL gCustomFontEnabled = NO;
 NSString *gCustomFontName = @"PingFang SC";
 static XHSHelperViewController *sharedInstance = nil;
 
-@interface XHSHelperViewController () <UITableViewDelegate, UITableViewDataSource>
+@interface XHSHelperViewController () <UITableViewDelegate, UITableViewDataSource, UIDocumentPickerDelegate>
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) UIVisualEffectView *containerView;
 @property (nonatomic, strong) UISwitch *watermarkSwitch;
@@ -658,6 +659,18 @@ static XHSHelperViewController *sharedInstance = nil;
                                                                    message:@"请选择要使用的字体"
                                                             preferredStyle:UIAlertControllerStyleAlert];
     
+    // 选项1：选择本地字体文件
+    UIAlertAction *fileAction = [UIAlertAction actionWithTitle:@"📁 选择字体文件(.ttf)" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        [self presentFontFilePicker];
+    }];
+    [alert addAction:fileAction];
+    
+    // 添加分割线（用空标题模拟）
+    UIAlertAction *separatorAction = [UIAlertAction actionWithTitle:@"—— 系统字体 ——" style:UIAlertActionStyleDefault handler:nil];
+    separatorAction.enabled = NO;
+    [alert addAction:separatorAction];
+    
+    // 选项2：系统预设字体
     NSArray *fontNames = @[@"PingFang SC", @"SF Pro Display", @"Helvetica Neue", @"Arial", @"Georgia", @"Times New Roman"];
     
     for (NSString *fontName in fontNames) {
@@ -674,6 +687,76 @@ static XHSHelperViewController *sharedInstance = nil;
     [alert addAction:cancelAction];
     
     [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)presentFontFilePicker {
+    if (@available(iOS 14.0, *)) {
+        NSArray *documentTypes = @[@"public.truetype-font"];
+        UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:documentTypes inMode:UIDocumentPickerModeOpen];
+        documentPicker.delegate = self;
+        documentPicker.allowsMultipleSelection = NO;
+        
+        [self presentViewController:documentPicker animated:YES completion:nil];
+    } else {
+        [self showToastWithMessage:@"请升级到iOS 14或更高版本以使用此功能"];
+    }
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+    if (urls.count > 0) {
+        NSURL *fileURL = urls.firstObject;
+        
+        // 验证文件扩展名
+        NSString *fileExtension = fileURL.pathExtension.lowercaseString;
+        if (![fileExtension isEqualToString:@"ttf"]) {
+            [self showToastWithMessage:@"请选择有效的.ttf字体文件"];
+            return;
+        }
+        
+        // 请求访问权限
+        [fileURL startAccessingSecurityScopedResource];
+        
+        // 加载字体
+        BOOL success = [self loadCustomFontFromURL:fileURL];
+        
+        [fileURL stopAccessingSecurityScopedResource];
+        
+        if (success) {
+            [self.tableView reloadData];
+            [self showToastWithMessage:@"字体加载成功"];
+        } else {
+            [self showToastWithMessage:@"字体加载失败，请尝试其他字体文件"];
+        }
+    }
+    
+    [controller dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (BOOL)loadCustomFontFromURL:(NSURL *)fontURL {
+    CFErrorRef error = NULL;
+    BOOL success = CTFontManagerRegisterFontsForURL((__bridge CFURLRef)fontURL, kCTFontManagerScopePersistent, &error);
+    
+    if (success) {
+        // 获取字体名称
+        NSData *fontData = [NSData dataWithContentsOfURL:fontURL];
+        if (fontData) {
+            CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)fontData);
+            CTFontDescriptorRef fontDescriptor = CTFontManagerCreateFontDescriptorFromDataProvider(provider);
+            
+            if (fontDescriptor) {
+                NSString *fontName = (__bridge_transfer NSString *)CTFontDescriptorCopyAttribute(fontDescriptor, kCTFontNameAttribute);
+                if (fontName) {
+                    gCustomFontName = fontName;
+                    [self updateWatermarkSettings];
+                    return YES;
+                }
+                CFRelease(fontDescriptor);
+            }
+            CFRelease(provider);
+        }
+    }
+    
+    return NO;
 }
 
 - (void)showAboutAlert {
