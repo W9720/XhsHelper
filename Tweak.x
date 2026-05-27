@@ -123,7 +123,7 @@ void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processe
 
 - (void)layoutSubviews {
     %orig;
-    self.hidden = YES;
+    [self setHidden:YES];
 }
 
 %end
@@ -222,8 +222,8 @@ void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processe
     %orig;
     
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        UIView *noteView = self.view;
-        for (UIView *subview in noteView.subviews) {
+        UIView *noteView = [self view];
+        for (UIView *subview in [noteView subviews]) {
             if ([NSStringFromClass([subview class]) containsString:@"Watermark"]) {
                 [subview setHidden:YES];
             }
@@ -242,7 +242,7 @@ void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processe
 - (void)layoutSubviews {
     %orig;
     
-    for (UIView *subview in self.subviews) {
+    for (UIView *subview in [self subviews]) {
         if ([NSStringFromClass([subview class]) containsString:@"Watermark"]) {
             [subview setHidden:YES];
         }
@@ -260,7 +260,7 @@ void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processe
 - (void)layoutSubviews {
     %orig;
     
-    for (UIView *subview in self.subviews) {
+    for (UIView *subview in [self subviews]) {
         if ([NSStringFromClass([subview class]) containsString:@"Watermark"]) {
             [subview setHidden:YES];
         }
@@ -1185,7 +1185,7 @@ void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processe
 
 %hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
 
-- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementView:(UIView *)view {
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementView:(UIView *)replacementView {
 }
 
 %end
@@ -1935,15 +1935,15 @@ void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processe
 
 %hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
 
-- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceSizeCategory:(UIUserInterfaceSizeCategory)sizeCategory {
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceSizeCategory:(UIUserInterfaceSizeClass)sizeCategory {
 }
 
 %end
 
 %hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
 
-- (UIUserInterfaceSizeCategory)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceSizeCategoryAtIndexPath:(NSIndexPath *)indexPath {
-    return UIUserInterfaceSizeCategoryUnspecified;
+- (UIUserInterfaceSizeClass)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceSizeCategoryAtIndexPath:(NSIndexPath *)indexPath {
+    return UIUserInterfaceSizeClassUnspecified;
 }
 
 %end
