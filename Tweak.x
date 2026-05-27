@@ -32,7 +32,7 @@ void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processe
     %orig(NO);
 }
 
-@end
+%end
 %end
 
 %group HidePublishButton
