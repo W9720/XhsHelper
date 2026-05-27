@@ -41,7 +41,7 @@ static XHSHelperViewController *sharedInstance = nil;
 - (instancetype)init {
     self = [super init];
     if (self) {
-        self.title = @"小红书助手";
+        self.title = @"Xhs Helper";
         
         // 设置模态样式
         self.modalPresentationStyle = UIModalPresentationOverFullScreen;
@@ -158,14 +158,14 @@ static XHSHelperViewController *sharedInstance = nil;
     
     // 添加标题
     UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 20, containerWidth, 40)];
-    titleLabel.text = @"小红书助手";
+    titleLabel.text = @"Xhs Helper";
     titleLabel.textAlignment = NSTextAlignmentCenter;
     titleLabel.font = [UIFont boldSystemFontOfSize:22];
     [self.containerView.contentView addSubview:titleLabel];
     
     // 添加副标题
     UILabel *subtitleLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 60, containerWidth, 20)];
-    subtitleLabel.text = @"自定义小红书功能";
+    subtitleLabel.text = @"By 喜爱民谣";
     subtitleLabel.textAlignment = NSTextAlignmentCenter;
     subtitleLabel.font = [UIFont systemFontOfSize:16];
     subtitleLabel.textColor = [UIColor grayColor];
@@ -236,7 +236,7 @@ static XHSHelperViewController *sharedInstance = nil;
     
     // 添加版本信息
     UILabel *versionLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, containerHeight - 30, containerWidth, 20)];
-    versionLabel.text = @"v1.0.0 © 2025 H7ang0";
+    versionLabel.text = @"v1.0.0 © 2026 喜爱民谣";
     versionLabel.textAlignment = NSTextAlignmentCenter;
     versionLabel.textColor = [UIColor grayColor];
     versionLabel.font = [UIFont systemFontOfSize:12];
@@ -293,7 +293,7 @@ static XHSHelperViewController *sharedInstance = nil;
         return cell;
     } else {
         UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"AboutCell" forIndexPath:indexPath];
-        cell.textLabel.text = @"关于小红书助手";
+        cell.textLabel.text = @"关于Xhs Helper";
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.backgroundColor = [UIColor clearColor];
         
@@ -376,9 +376,9 @@ static XHSHelperViewController *sharedInstance = nil;
     if (section == 0) {
         footerLabel.text = @"移除视频和实况图片水印，允许保存受限制内容";
     } else if (section == 1) {
-        footerLabel.text = @"自动回复私信和评论，节省时间";
+        footerLabel.text = @"自动回复私信和评论";
     } else {
-        footerLabel.text = @"© 2023-2025 H7ang0";
+        footerLabel.text = @"© 2026 喜爱民谣";
     }
     
     [footerView addSubview:footerLabel];
@@ -517,9 +517,9 @@ static XHSHelperViewController *sharedInstance = nil;
     if (section == 0) {
         return @"移除视频和实况图片水印，允许保存受限制内容";
     } else if (section == 1) {
-        return @"自动回复私信和评论，节省时间";
+        return @"自动回复私信和评论";
     } else {
-        return @"© 2023-2024 H7ang0 保留所有权利";
+        return @"© 2026 喜爱民谣 保留所有权利";
     }
 }
 
@@ -586,8 +586,8 @@ static XHSHelperViewController *sharedInstance = nil;
 }
 
 - (void)showAboutAlert {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"关于小红书助手"
-                                                                   message:@"小红书助手是一个增强小红书体验的工具，让您可以下载无水印视频和图片，并支持强制保存到相册。\n\n此插件仅供学习交流使用，请勿用于商业目的。"
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"关于Xhs Helper"
+                                                                   message:@"Xhs Helper\n\n此插件仅供学习交流使用，请勿用于商业目的。\n\nBy 喜爱民谣：梦泪爱吃死白莲"
                                                             preferredStyle:UIAlertControllerStyleAlert];
     
     UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil];
