@@ -322,7 +322,7 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
             }
         }
         
-        cell.textLabel.text = @"小红书助手";
+        cell.textLabel.text = @"Xhs Helper";
         
         UIImage *starImage = [UIImage imageNamed:@"star_icon"];
         
@@ -612,7 +612,7 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
 
 %ctor {
     @autoreleasepool {
-        NSLog(@"[XHSNOWatermark] 小红书助手插件已加载，版本1.0");
+        NSLog(@"[XHSNOWatermark] Xhs Helper已加载，版本1.0");
         
         gWatermarkEnabled = YES;
         gSaveEnabled = YES;
