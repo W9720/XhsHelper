@@ -647,10 +647,10 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
                     NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
                     [invocation setTarget:self];
                     [invocation setSelector:selector];
-                    [invocation setArgument:&comment atIndex:2];
-                    [invocation setArgument:&gCommentAutoReplyText atIndex:3];
+                    [invocation setArgument:(void *)&comment atIndex:2];
+                    [invocation setArgument:(void *)&gCommentAutoReplyText atIndex:3];
                     id nilArg = nil;
-                    [invocation setArgument:&nilArg atIndex:4];
+                    [invocation setArgument:(void *)&nilArg atIndex:4];
                     [invocation invoke];
                 }
             });
