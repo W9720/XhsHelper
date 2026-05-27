@@ -123,7 +123,7 @@ void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processe
 
 - (void)layoutSubviews {
     %orig;
-    [self setHidden:YES];
+    ((void (*)(id, SEL, BOOL))objc_msgSend)(self, @selector(setHidden:), YES);
 }
 
 %end
@@ -222,10 +222,11 @@ void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processe
     %orig;
     
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        UIView *noteView = [self view];
-        for (UIView *subview in [noteView subviews]) {
+        UIView *noteView = ((UIView *(*)(id, SEL))objc_msgSend)(self, @selector(view));
+        NSArray *subviews = ((NSArray *(*)(id, SEL))objc_msgSend)(noteView, @selector(subviews));
+        for (UIView *subview in subviews) {
             if ([NSStringFromClass([subview class]) containsString:@"Watermark"]) {
-                [subview setHidden:YES];
+                ((void (*)(id, SEL, BOOL))objc_msgSend)(subview, @selector(setHidden:), YES);
             }
         }
     });
@@ -242,9 +243,10 @@ void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processe
 - (void)layoutSubviews {
     %orig;
     
-    for (UIView *subview in [self subviews]) {
+    NSArray *subviews = ((NSArray *(*)(id, SEL))objc_msgSend)(self, @selector(subviews));
+    for (UIView *subview in subviews) {
         if ([NSStringFromClass([subview class]) containsString:@"Watermark"]) {
-            [subview setHidden:YES];
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(subview, @selector(setHidden:), YES);
         }
     }
 }
@@ -260,9 +262,10 @@ void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processe
 - (void)layoutSubviews {
     %orig;
     
-    for (UIView *subview in [self subviews]) {
+    NSArray *subviews = ((NSArray *(*)(id, SEL))objc_msgSend)(self, @selector(subviews));
+    for (UIView *subview in subviews) {
         if ([NSStringFromClass([subview class]) containsString:@"Watermark"]) {
-            [subview setHidden:YES];
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(subview, @selector(setHidden:), YES);
         }
     }
 }
