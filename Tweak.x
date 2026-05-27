@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#import <objc/runtime.h>
 #import "XHSHelperViewController.h"
 
 @interface XYVFVideoDownloaderManager : NSObject
@@ -525,32 +526,55 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
 %end
 
 %group AutoReply
+%end
 
-// Hook私信发送类
-%hook XYMessageUIKit.XYChatTableBaseViewModel
+// Swift桥接类的方法替换实现
+@interface XYChatTableBaseViewModel_Swizzle : NSObject
+@end
 
-// 监听新消息添加
-- (void)appendMessageAndCellViewModelWith:(id)message {
-    %orig;
+@implementation XYChatTableBaseViewModel_Swizzle
+
++ (void)load {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        Class cls = NSClassFromString(@"XYMessageUIKit.XYChatTableBaseViewModel");
+        if (cls) {
+            SEL originalSelector = @selector(appendMessageAndCellViewModelWith:);
+            SEL swizzledSelector = @selector(xhshelper_appendMessageAndCellViewModelWith:);
+            
+            Method originalMethod = class_getInstanceMethod(cls, originalSelector);
+            Method swizzledMethod = class_getInstanceMethod([self class], swizzledSelector);
+            
+            if (originalMethod && swizzledMethod) {
+                // 将swizzle方法添加到目标类
+                class_addMethod(cls, swizzledSelector, method_getImplementation(swizzledMethod), method_getTypeEncoding(swizzledMethod));
+                // 获取添加后的方法
+                swizzledMethod = class_getInstanceMethod(cls, swizzledSelector);
+                method_exchangeImplementations(originalMethod, swizzledMethod);
+                NSLog(@"[XHSHelper] Swizzled XYChatTableBaseViewModel.appendMessageAndCellViewModelWith:");
+            }
+        }
+    });
+}
+
+- (void)xhshelper_appendMessageAndCellViewModelWith:(id)message {
+    // 调用原始实现
+    [self xhshelper_appendMessageAndCellViewModelWith:message];
     
     if (gAutoReplyEnabled) {
-        // 判断是否是对方发送的消息，如果是则自动回复
         BOOL isIncomingMessage = NO;
         
         if ([message respondsToSelector:@selector(isIncomingMessage)]) {
             isIncomingMessage = [(NSObject *)message performSelector:@selector(isIncomingMessage)];
         } else if ([message respondsToSelector:@selector(direction)] && 
                   [[(NSObject *)message performSelector:@selector(direction)] intValue] == 2) {
-            // 根据direction判断是否是接收的消息
             isIncomingMessage = YES;
         }
         
         if (isIncomingMessage) {
-            // 延迟2秒发送自动回复
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 NSLog(@"[XHSHelper] 准备发送私信自动回复: %@", gAutoReplyText);
                 
-                // 构造回复消息并发送
                 if ([self respondsToSelector:@selector(sendTextMessage:)]) {
                     [self performSelector:@selector(sendTextMessage:) withObject:gAutoReplyText];
                 } else if ([self respondsToSelector:@selector(sendText:)]) {
@@ -561,17 +585,41 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
     }
 }
 
-%end
+@end
 
-// Hook评论回复类
-%hook XYNoteBasic.CommentService
+@interface CommentService_Swizzle : NSObject
+@end
 
-// 监听评论发布
-- (void)publishComment:(id)comment completion:(id)completion {
-    %orig;
+@implementation CommentService_Swizzle
+
++ (void)load {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        Class cls = NSClassFromString(@"XYNoteBasic.CommentService");
+        if (cls) {
+            SEL originalSelector = @selector(publishComment:completion:);
+            SEL swizzledSelector = @selector(xhshelper_publishComment:completion:);
+            
+            Method originalMethod = class_getInstanceMethod(cls, originalSelector);
+            Method swizzledMethod = class_getInstanceMethod([self class], swizzledSelector);
+            
+            if (originalMethod && swizzledMethod) {
+                // 将swizzle方法添加到目标类
+                class_addMethod(cls, swizzledSelector, method_getImplementation(swizzledMethod), method_getTypeEncoding(swizzledMethod));
+                // 获取添加后的方法
+                swizzledMethod = class_getInstanceMethod(cls, swizzledSelector);
+                method_exchangeImplementations(originalMethod, swizzledMethod);
+                NSLog(@"[XHSHelper] Swizzled CommentService.publishComment:completion:");
+            }
+        }
+    });
+}
+
+- (void)xhshelper_publishComment:(id)comment completion:(id)completion {
+    // 调用原始实现
+    [self xhshelper_publishComment:comment completion:completion];
     
     if (gCommentAutoReplyEnabled) {
-        // 判断是否是对方的评论
         BOOL isOtherComment = NO;
         
         if ([comment respondsToSelector:@selector(isUserComment)] &&
@@ -579,7 +627,6 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
             isOtherComment = YES;
         } else if ([comment respondsToSelector:@selector(userId)] && 
                   [comment performSelector:@selector(userId)] != nil) {
-            // 检查评论用户ID是否不是当前用户
             id currentUserId = nil;
             if ([NSClassFromString(@"XYUserModel") respondsToSelector:@selector(currentUserId)]) {
                 currentUserId = [NSClassFromString(@"XYUserModel") performSelector:@selector(currentUserId)];
@@ -591,7 +638,6 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
         }
         
         if (isOtherComment) {
-            // 延迟3秒回复评论
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 NSLog(@"[XHSHelper] 准备发送评论自动回复: %@", gCommentAutoReplyText);
                 
@@ -606,9 +652,7 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
     }
 }
 
-%end
-
-%end
+@end
 
 %ctor {
     @autoreleasepool {
