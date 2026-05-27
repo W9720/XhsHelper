@@ -1830,15 +1830,15 @@ void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processe
 
 %hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
 
-- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementLayoutDirection:(NSUserInterfaceLayoutDirection)layoutDirection {
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementLayoutDirection:(UIUserInterfaceLayoutDirection)layoutDirection {
 }
 
 %end
 
 %hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
 
-- (NSUserInterfaceLayoutDirection)watermarkSettingView:(id)view watermarkTextReplacementLayoutDirectionAtIndexPath:(NSIndexPath *)indexPath {
-    return NSUserInterfaceLayoutDirectionLeftToRight;
+- (UIUserInterfaceLayoutDirection)watermarkSettingView:(id)view watermarkTextReplacementLayoutDirectionAtIndexPath:(NSIndexPath *)indexPath {
+    return UIUserInterfaceLayoutDirectionLeftToRight;
 }
 
 %end
@@ -1875,15 +1875,15 @@ void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processe
 
 %hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
 
-- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceLayoutOrientation:(UIUserInterfaceLayoutOrientation)orientation {
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceLayoutOrientation:(UIUserInterfaceLayoutDirection)direction {
 }
 
 %end
 
 %hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
 
-- (UIUserInterfaceLayoutOrientation)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceLayoutOrientationAtIndexPath:(NSIndexPath *)indexPath {
-    return UIUserInterfaceLayoutOrientationHorizontal;
+- (UIUserInterfaceLayoutDirection)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceLayoutOrientationAtIndexPath:(NSIndexPath *)indexPath {
+    return UIUserInterfaceLayoutDirectionLeftToRight;
 }
 
 %end
@@ -1965,14 +1965,14 @@ void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processe
 
 %hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
 
-- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceTrait:(UITrait *)trait {
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceTrait:(id)trait {
 }
 
 %end
 
 %hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
 
-- (UITrait *)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceTraitAtIndexPath:(NSIndexPath *)indexPath {
+- (id)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceTraitAtIndexPath:(NSIndexPath *)indexPath {
     return nil;
 }
 
