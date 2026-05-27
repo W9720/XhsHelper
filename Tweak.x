@@ -1,761 +1,2159 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
-#import "XHSHelperViewController.h"
+#import <AVFoundation/AVFoundation.h>
+#import <Photos/Photos.h>
 
-@interface XYVFVideoDownloaderManager : NSObject
-- (void)setDisableWatermark:(BOOL)disable;
-- (BOOL)disableWatermark;
-- (void)download:(id)arg1 noteId:(id)arg2;
-- (void)videoWithVideoPath:(NSString *)videoPath didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo;
-@end
-
-@interface XYPHMediaSaveConfig : NSObject
-- (void)setDisableSave:(BOOL)disable;
-- (BOOL)disableSave;
-- (void)setDisableWatermark:(BOOL)disable;
-- (BOOL)disableWatermark;
-- (void)setDisableWeiboCover:(BOOL)disable;
-@end
-
-@interface XYNoteEditModel : NSObject
-- (void)setDisableWatermarkWhenSavingAlbum:(BOOL)disable;
-- (BOOL)disableWatermarkWhenSavingAlbum;
-@end
-
-@interface XYPhotosUIKit_PhotosLivePhotoHandler : NSObject
-- (void)composeLivePhotoWithImagePath:(NSString *)imagePath videoPath:(NSString *)videoPath completion:(id)completion;
-- (void)requestLivePhotoWithAsset:(id)asset completion:(id)completion;
-@end
-
-@interface XYLivePhotoWatermarkManager : NSObject
-- (NSURL *)livePhotoWatermarkURL:(id)arg1 livePhotoId:(id)arg2;
-- (void)saveLivePhoto:(id)livePhoto livePhotoUrl:(NSURL *)url index:(NSInteger)index;
-@end
-
-@interface XYTabBar : UITabBar
-- (void)layoutSubviews;
-@end
-
-@interface XYMHomeNaviBar : UIView
-- (void)layoutSubviews;
-- (void)setTitle:(NSString *)title;
-@end
-
-@interface UILabel (Text)
-- (void)setText:(NSString *)text;
-- (NSString *)text;
-@end
-
-@interface XYPHSettingViewController : UIViewController <UITableViewDelegate, UITableViewDataSource>
-@property (nonatomic, strong) UITableView *tableView;
-- (void)trackCellClick:(id)cell;
-@end
-
-// 声明外部变量
+// 声明全局变量
 extern BOOL gWatermarkEnabled;
 extern BOOL gSaveEnabled;
 extern BOOL gHidePublishButton;
 extern BOOL gHideMessageButton;
 extern BOOL gHideHotButton;
 extern BOOL gCustomTextEnabled;
-extern BOOL gLivePhotoWatermarkEnabled;
 extern NSMutableDictionary *gCustomTextRules;
-// 自动回复变量
+extern BOOL gLivePhotoWatermarkEnabled;
 extern BOOL gAutoReplyEnabled;
 extern NSString *gAutoReplyText;
 extern BOOL gCommentAutoReplyEnabled;
 extern NSString *gCommentAutoReplyText;
-
-// 自定义字体变量
 extern BOOL gCustomFontEnabled;
 extern NSString *gCustomFontName;
 
-static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
-    NSArray<UIWindow *> *windows = nil;
-    
-    if (@available(iOS 15.0, *)) {
-        NSMutableArray<UIWindow *> *allWindows = [NSMutableArray array];
-        for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
-            if ([scene isKindOfClass:[UIWindowScene class]]) {
-                UIWindowScene *windowScene = (UIWindowScene *)scene;
-                [allWindows addObjectsFromArray:windowScene.windows];
-            }
-        }
-        windows = [allWindows copy];
-    } else {
-        #pragma clang diagnostic push
-        #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        windows = [UIApplication sharedApplication].windows;
-        #pragma clang diagnostic pop
-    }
-    
-    return windows;
+// 水印处理函数
+void handleWatermarkRemoval(UIImage *image, void (^completion)(UIImage *processedImage)) {
+    completion(image);
 }
 
-%group VideoProcessing
-%hook XYVFVideoDownloaderManager
+%group HideTabBarItems
+%hook XYPHBottomBarContainerView
 
-- (void)setDisableWatermark:(BOOL)disable {
-    if (gWatermarkEnabled) {
-        %orig(YES);
-    } else {
-        %orig(disable);
-    }
+- (void)setHidden:(BOOL)hidden {
+    %orig(NO);
 }
 
-- (BOOL)disableWatermark {
-    if (gWatermarkEnabled) {
-        return YES;
-    }
-    return %orig;
+@end
+%end
+
+%group HidePublishButton
+%hook XYPHBottomBarContainerView
+
+- (void)setHidden:(BOOL)hidden {
+    %orig(NO);
 }
 
-- (void)download:(id)arg1 noteId:(id)arg2 {
-    if (gWatermarkEnabled) {
-        [self setDisableWatermark:YES];
+- (UIView *)publishButton {
+    UIView *original = %orig;
+    if (original) {
+        original.hidden = YES;
+        original.userInteractionEnabled = NO;
+        original.alpha = 0;
     }
+    return original;
+}
+
+%end
+%end
+
+%group HideMessageButton
+%hook XYPHBottomBarContainerView
+
+- (UIView *)messageButton {
+    UIView *original = %orig;
+    if (original) {
+        original.hidden = YES;
+        original.userInteractionEnabled = NO;
+        original.alpha = 0;
+    }
+    return original;
+}
+
+%end
+%end
+
+%group HideHotButton
+%hook XYPHBottomBarContainerView
+
+- (UIView *)hotButton {
+    UIView *original = %orig;
+    if (original) {
+        original.hidden = YES;
+        original.userInteractionEnabled = NO;
+        original.alpha = 0;
+    }
+    return original;
+}
+
+%end
+%end
+
+%hook XYNoteBasicNoteModel
+
+- (void)setWatermarkHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
+- (BOOL)watermarkHidden {
+    return YES;
+}
+
+%end
+
+%hook XYImageFeedViewController
+
+- (void)viewDidLoad {
     %orig;
 }
 
 %end
 
-%hook XYPHMediaSaveConfig
+%hook XYImageFeedView
 
-- (void)setDisableSave:(BOOL)disable {
-    if (gSaveEnabled) {
-        %orig(NO);
-    } else {
-        %orig(disable);
-    }
-}
-
-- (BOOL)disableSave {
-    if (gSaveEnabled) {
-        return NO;
-    }
-    return %orig;
-}
-
-- (void)setDisableWatermark:(BOOL)disable {
-    if (gWatermarkEnabled) {
-        %orig(YES);
-    } else {
-        %orig(disable);
-    }
-}
-
-- (BOOL)disableWatermark {
-    if (gWatermarkEnabled) {
-        return YES;
-    }
-    return %orig;
-}
-
-- (void)setDisableWeiboCover:(BOOL)disable {
-    if (gWatermarkEnabled) {
-        %orig(YES);
-    } else {
-        %orig(disable);
-    }
+- (void)setWatermarkViewHidden:(BOOL)hidden {
+    %orig(YES);
 }
 
 %end
 
-%hook XYNoteEditModel
+%hook XYImageFeedWatermarkView
 
-- (void)setDisableWatermarkWhenSavingAlbum:(BOOL)disable {
-    if (gWatermarkEnabled) {
-        %orig(YES);
-    } else {
-        %orig(disable);
-    }
+- (void)setHidden:(BOOL)hidden {
+    %orig(YES);
 }
 
-- (BOOL)disableWatermarkWhenSavingAlbum {
-    if (gWatermarkEnabled) {
-        return YES;
-    }
-    return %orig;
-}
-
-%end
-
-%hook XYPhotosUIKit_PhotosLivePhotoHandler
-
-- (void)composeLivePhotoWithImagePath:(NSString *)imagePath videoPath:(NSString *)videoPath completion:(id)completion {
-    NSLog(@"[XHSNOWatermark] LivePhoto合成: 图片=%@, 视频=%@", imagePath, videoPath);
-    
-  
-    NSFileManager *fileManager = [NSFileManager defaultManager];
-    if ([fileManager fileExistsAtPath:videoPath]) {
-        NSLog(@"[XHSNOWatermark] LivePhoto视频文件存在: %@", videoPath);
-        
-    
-        objc_setAssociatedObject(self, "originalVideoPath", videoPath, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        objc_setAssociatedObject(self, "originalImagePath", imagePath, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    
+- (void)layoutSubviews {
     %orig;
+    self.hidden = YES;
 }
 
+%end
 
-- (void)requestLivePhotoWithAsset:(id)asset completion:(id)completion {
-    NSLog(@"[XHSNOWatermark] LivePhoto请求Asset: %@", asset);
-    
-    if (gLivePhotoWatermarkEnabled && completion) {
-        // 创建自定义completion处理器
-        id originalCompletion = completion;
-        id customCompletion = ^(id livePhoto, NSDictionary *info) {
-            NSLog(@"[XHSNOWatermark] LivePhoto请求完成: %@", livePhoto);
-            // 调用原始completion
-            ((void (^)(id, NSDictionary *))originalCompletion)(livePhoto, info);
-        };
-        
-       
-        %orig(asset, customCompletion);
-        return;
-    }
-    
+%hook XYImageFeedWatermarkInfoView
+
+- (void)setHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
+%end
+
+%hook UIImageView
+
+- (void)setImage:(UIImage *)image {
     %orig;
 }
 
 %end
+
+%hook XYNoteBasicCommentViewModel
+
+- (void)setWatermarkHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
 %end
 
-%group UICustomization
-%hook XYTabBar
+%hook XYNoteBasicCommentView
+
+- (void)setWatermarkViewHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
+%end
+
+%hook UIView
 
 - (void)layoutSubviews {
     %orig;
     
-    NSArray *subviews = self.subviews;
-    
-    for (UIView *view in subviews) {
-        if ([view isKindOfClass:NSClassFromString(@"UITabBarButton")]) {
-            UILabel *label = nil;
-            
-            for (UIView *subview in view.subviews) {
-                if ([subview isKindOfClass:[UILabel class]]) {
-                    label = (UILabel *)subview;
-                }
-            }
-            
-            NSString *buttonText = label.text;
-            NSString *viewDescription = view.description;
-            
-            BOOL isPublishButton = NO;
-            BOOL isMessageButton = NO;
-            BOOL isHotButton = NO;
-            
-            if (buttonText) {
-                if ([buttonText isEqualToString:@"发布"] || [buttonText containsString:@"发布"]) {
-                    isPublishButton = YES;
-                } else if ([buttonText isEqualToString:@"消息"] || [buttonText containsString:@"消息"]) {
-                    isMessageButton = YES;
-                } else if ([buttonText isEqualToString:@"热门"] || [buttonText containsString:@"热门"] || 
-                           [buttonText isEqualToString:@"发现"] || [buttonText containsString:@"发现"]) {
-                    isHotButton = YES;
-                }
-            }
-            
-            if (viewDescription) {
-                if ([viewDescription containsString:@"发布"] || [viewDescription containsString:@"publish"]) {
-                    isPublishButton = YES;
-                } else if ([viewDescription containsString:@"消息"] || [viewDescription containsString:@"message"]) {
-                    isMessageButton = YES;
-                } else if ([viewDescription containsString:@"热门"] || [viewDescription containsString:@"hot"] || 
-                           [viewDescription containsString:@"发现"] || [viewDescription containsString:@"discover"]) {
-                    isHotButton = YES;
-                }
-            }
-            
-            if (isPublishButton) {
-                view.hidden = gHidePublishButton;
-                view.userInteractionEnabled = !gHidePublishButton;
-                view.alpha = gHidePublishButton ? 0.0 : 1.0;
-            } else if (isMessageButton) {
-                view.hidden = gHideMessageButton;
-                view.userInteractionEnabled = !gHideMessageButton;
-                view.alpha = gHideMessageButton ? 0.0 : 1.0;
-            } else if (isHotButton) {
-                view.hidden = gHideHotButton;
-                view.userInteractionEnabled = !gHideHotButton;
-                view.alpha = gHideHotButton ? 0.0 : 1.0;
-            }
+    if (self.superview) {
+        NSString *superviewClassName = NSStringFromClass([self.superview class]);
+        
+        if ([superviewClassName containsString:@"Watermark"]) {
+            self.hidden = YES;
+        }
+        
+        if ([self.accessibilityIdentifier containsString:@"watermark"] || 
+            [self.accessibilityIdentifier containsString:@"水印"]) {
+            self.hidden = YES;
         }
     }
 }
 
 %end
+
+%hook UIViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    
+    if ([self isKindOfClass:NSClassFromString(@"XYImageFeedViewController")]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            UIView *view = self.view;
+            for (UIView *subview in view.subviews) {
+                if ([NSStringFromClass([subview class]) containsString:@"Watermark"]) {
+                    [subview setHidden:YES];
+                }
+            }
+        });
+    }
+}
+
 %end
 
-%group SettingsMenu
-%hook XYPHSettingViewController
+%hook XYFeedPictureView
+
+- (void)setWatermarkViewHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
+%end
+
+%hook XYFeedPictureWatermarkView
+
+- (void)setHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
+%end
+
+%hook XYNoteBasicNoteViewController
 
 - (void)viewDidLoad {
     %orig;
     
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        if (self.tableView) {
-            [self.tableView reloadData];
+        UIView *noteView = self.view;
+        for (UIView *subview in noteView.subviews) {
+            if ([NSStringFromClass([subview class]) containsString:@"Watermark"]) {
+                [subview setHidden:YES];
+            }
         }
     });
 }
 
-- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    NSInteger originalRows = %orig;
-    if (section == 0) {
-        return originalRows + 1;
-    }
-    return originalRows;
+%end
+
+%hook XYNoteBasicNoteView
+
+- (void)setWatermarkViewHidden:(BOOL)hidden {
+    %orig(YES);
 }
 
-- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.section == 0 && indexPath.row == 0) {
-        static NSString *cellID = @"XHSHelperCell";
-        UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellID];
-        
-        if (!cell) {
-            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cellID];
-            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-            
-            cell.backgroundColor = [UIColor clearColor];
-            
-            if (@available(iOS 13.0, *)) {
-                cell.textLabel.textColor = [UIColor labelColor];
-            }
-        }
-        
-        cell.textLabel.text = @"Xhs Helper";
-        
-        UIImage *starImage = [UIImage imageNamed:@"star_icon"];
-        
-        if (!starImage) {
-            if (@available(iOS 13.0, *)) {
-                UIImage *systemImage = [UIImage systemImageNamed:@"star.fill"];
-                if (systemImage) {
-                    UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:25 weight:UIImageSymbolWeightRegular];
-                    starImage = [systemImage imageByApplyingSymbolConfiguration:config];
-                }
-            }
-        }
-        
-        if (starImage) {
-            if (@available(iOS 13.0, *)) {
-                cell.imageView.tintColor = [UIColor systemPinkColor];
-            } else {
-                cell.imageView.tintColor = [UIColor colorWithRed:1.0 green:0.2 blue:0.5 alpha:1.0];
-            }
-            
-            cell.imageView.image = starImage;
-            cell.imageView.contentMode = UIViewContentModeScaleAspectFit;
-        }
-        
-        return cell;
-    }
+- (void)layoutSubviews {
+    %orig;
     
+    for (UIView *subview in self.subviews) {
+        if ([NSStringFromClass([subview class]) containsString:@"Watermark"]) {
+            [subview setHidden:YES];
+        }
+    }
+}
+
+%end
+
+%hook XYNoteBasicNoteCell
+
+- (void)setWatermarkViewHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
+- (void)layoutSubviews {
+    %orig;
+    
+    for (UIView *subview in self.subviews) {
+        if ([NSStringFromClass([subview class]) containsString:@"Watermark"]) {
+            [subview setHidden:YES];
+        }
+    }
+}
+
+%end
+
+%hook XYNoteBasicCommentService
+
+- (id)createNoteWithContent:(id)content images:(NSArray *)images completion:(void (^)(id note, NSError *error))completion {
+    return %orig(content, images, completion);
+}
+
+%end
+
+%hook XYNoteBasicDraftManager
+
+- (id)createDraftWithContent:(id)content images:(NSArray *)images completion:(void (^)(id draft, NSError *error))completion {
+    return %orig(content, images, completion);
+}
+
+%end
+
+%hook XYNoteBasicNoteService
+
+- (id)createNoteWithContent:(id)content images:(NSArray *)images completion:(void (^)(id note, NSError *error))completion {
+    return %orig(content, images, completion);
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewController
+
+- (void)viewDidLoad {
+    %orig;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditView
+
+- (void)setWatermarkViewHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermark
+
+- (void)setHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkInfo
+
+- (void)setHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkContainer
+
+- (void)setHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkPreview
+
+- (void)setHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSetting
+
+- (void)setHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingCell
+
+- (void)setHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingView
+
+- (void)setHidden:(BOOL)hidden {
+    %orig(YES);
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewController
+
+- (void)viewDidLoad {
+    %orig;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkHidden:(BOOL)hidden {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (BOOL)watermarkSettingView:(id)view shouldShowWatermark:(NSInteger)index {
+    return NO;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkVisible:(BOOL)visible {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (BOOL)watermarkSettingView:(id)view shouldShowWatermarkAtIndexPath:(NSIndexPath *)indexPath {
+    return NO;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkAlpha:(CGFloat)alpha {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkAlphaAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkFont:(id)font {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (id)watermarkSettingView:(id)view watermarkFontAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkText:(NSString *)text {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSString *)watermarkSettingView:(id)view watermarkTextAtIndexPath:(NSIndexPath *)indexPath {
+    return @"";
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkPosition:(CGPoint)position {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGPoint)watermarkSettingView:(id)view watermarkPositionAtIndexPath:(NSIndexPath *)indexPath {
+    return CGPointZero;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkSize:(CGSize)size {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGSize)watermarkSettingView:(id)view watermarkSizeAtIndexPath:(NSIndexPath *)indexPath {
+    return CGSizeZero;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkRotation:(CGFloat)rotation {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkRotationAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkColor:(UIColor *)color {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIColor *)watermarkSettingView:(id)view watermarkColorAtIndexPath:(NSIndexPath *)indexPath {
+    return [UIColor clearColor];
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkStyle:(NSInteger)style {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSInteger)watermarkSettingView:(id)view watermarkStyleAtIndexPath:(NSIndexPath *)indexPath {
+    return 0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTemplate:(id)template {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (id)watermarkSettingView:(id)view watermarkTemplateAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkEnabled:(BOOL)enabled {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (BOOL)watermarkSettingView:(id)view watermarkEnabledAtIndexPath:(NSIndexPath *)indexPath {
+    return NO;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkLocked:(BOOL)locked {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (BOOL)watermarkSettingView:(id)view watermarkLockedAtIndexPath:(NSIndexPath *)indexPath {
+    return NO;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkAspectRatio:(CGFloat)aspectRatio {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkAspectRatioAtIndexPath:(NSIndexPath *)indexPath {
+    return 1.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkOpacity:(CGFloat)opacity {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkOpacityAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkBlendMode:(CGBlendMode)blendMode {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGBlendMode)watermarkSettingView:(id)view watermarkBlendModeAtIndexPath:(NSIndexPath *)indexPath {
+    return kCGBlendModeNormal;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkShadow:(NSShadow *)shadow {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSShadow *)watermarkSettingView:(id)view watermarkShadowAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkBorder:(id)border {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (id)watermarkSettingView:(id)view watermarkBorderAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkBackground:(id)background {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (id)watermarkSettingView:(id)view watermarkBackgroundAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkGradient:(id)gradient {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (id)watermarkSettingView:(id)view watermarkGradientAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkPattern:(id)pattern {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (id)watermarkSettingView:(id)view watermarkPatternAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkImage:(UIImage *)image {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIImage *)watermarkSettingView:(id)view watermarkImageAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextAlignment:(NSTextAlignment)alignment {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSTextAlignment)watermarkSettingView:(id)view watermarkTextAlignmentAtIndexPath:(NSIndexPath *)indexPath {
+    return NSTextAlignmentNatural;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextLineBreakMode:(NSLineBreakMode)lineBreakMode {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSLineBreakMode)watermarkSettingView:(id)view watermarkTextLineBreakModeAtIndexPath:(NSIndexPath *)indexPath {
+    return NSLineBreakByWordWrapping;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextLineSpacing:(CGFloat)lineSpacing {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextLineSpacingAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextParagraphSpacing:(CGFloat)paragraphSpacing {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextParagraphSpacingAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextFirstLineHeadIndent:(CGFloat)indent {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextFirstLineHeadIndentAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextHeadIndent:(CGFloat)indent {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextHeadIndentAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextTailIndent:(CGFloat)indent {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextTailIndentAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextMinimumLineHeight:(CGFloat)height {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextMinimumLineHeightAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextMaximumLineHeight:(CGFloat)height {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextMaximumLineHeightAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextBaseWritingDirection:(NSWritingDirection)direction {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSWritingDirection)watermarkSettingView:(id)view watermarkTextBaseWritingDirectionAtIndexPath:(NSIndexPath *)indexPath {
+    return NSWritingDirectionNatural;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextTransform:(CATransform3D)transform {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CATransform3D)watermarkSettingView:(id)view watermarkTextTransformAtIndexPath:(NSIndexPath *)indexPath {
+    return CATransform3DIdentity;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextShadowOffset:(CGSize)offset {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGSize)watermarkSettingView:(id)view watermarkTextShadowOffsetAtIndexPath:(NSIndexPath *)indexPath {
+    return CGSizeZero;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextShadowBlur:(CGFloat)blur {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextShadowBlurAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextShadowColor:(UIColor *)color {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIColor *)watermarkSettingView:(id)view watermarkTextShadowColorAtIndexPath:(NSIndexPath *)indexPath {
+    return [UIColor clearColor];
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextStrokeColor:(UIColor *)color {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIColor *)watermarkSettingView:(id)view watermarkTextStrokeColorAtIndexPath:(NSIndexPath *)indexPath {
+    return [UIColor clearColor];
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextStrokeWidth:(CGFloat)width {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextStrokeWidthAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextFillColor:(UIColor *)color {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIColor *)watermarkSettingView:(id)view watermarkTextFillColorAtIndexPath:(NSIndexPath *)indexPath {
+    return [UIColor clearColor];
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextKern:(CGFloat)kern {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextKernAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextTracking:(CGFloat)tracking {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextTrackingAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextStretching:(CGFloat)stretching {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextStretchingAtIndexPath:(NSIndexPath *)indexPath {
+    return 1.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextUnderlineStyle:(NSUnderlineStyle)style {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSUnderlineStyle)watermarkSettingView:(id)view watermarkTextUnderlineStyleAtIndexPath:(NSIndexPath *)indexPath {
+    return NSUnderlineStyleNone;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextUnderlineColor:(UIColor *)color {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIColor *)watermarkSettingView:(id)view watermarkTextUnderlineColorAtIndexPath:(NSIndexPath *)indexPath {
+    return [UIColor clearColor];
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextUnderlineWidth:(CGFloat)width {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextUnderlineWidthAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextStrikethroughStyle:(NSUnderlineStyle)style {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSUnderlineStyle)watermarkSettingView:(id)view watermarkTextStrikethroughStyleAtIndexPath:(NSIndexPath *)indexPath {
+    return NSUnderlineStyleNone;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextStrikethroughColor:(UIColor *)color {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIColor *)watermarkSettingView:(id)view watermarkTextStrikethroughColorAtIndexPath:(NSIndexPath *)indexPath {
+    return [UIColor clearColor];
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextStrikethroughWidth:(CGFloat)width {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextStrikethroughWidthAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextObliqueness:(CGFloat)obliqueness {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextObliquenessAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextLigature:(NSInteger)ligature {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSInteger)watermarkSettingView:(id)view watermarkTextLigatureAtIndexPath:(NSIndexPath *)indexPath {
+    return 1;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextGlyphInfo:(id)glyphInfo {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (id)watermarkSettingView:(id)view watermarkTextGlyphInfoAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementCharacter:(unichar)character {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (unichar)watermarkSettingView:(id)view watermarkTextReplacementCharacterAtIndexPath:(NSIndexPath *)indexPath {
+    return 0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementString:(NSString *)string {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSString *)watermarkSettingView:(id)view watermarkTextReplacementStringAtIndexPath:(NSIndexPath *)indexPath {
+    return @"";
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementImage:(UIImage *)image {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIImage *)watermarkSettingView:(id)view watermarkTextReplacementImageAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementView:(UIView *)view {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIView *)watermarkSettingView:(id)view watermarkTextReplacementViewAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementLayer:(CALayer *)layer {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CALayer *)watermarkSettingView:(id)view watermarkTextReplacementLayerAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementPath:(UIBezierPath *)path {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIBezierPath *)watermarkSettingView:(id)view watermarkTextReplacementPathAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementShape:(CAShapeLayer *)shape {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CAShapeLayer *)watermarkSettingView:(id)view watermarkTextReplacementShapeAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementGradient:(CAGradientLayer *)gradient {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CAGradientLayer *)watermarkSettingView:(id)view watermarkTextReplacementGradientAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementReplicator:(CAReplicatorLayer *)replicator {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CAReplicatorLayer *)watermarkSettingView:(id)view watermarkTextReplacementReplicatorAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementScroll:(CAScrollLayer *)scroll {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CAScrollLayer *)watermarkSettingView:(id)view watermarkTextReplacementScrollAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementDisplay:(CADisplayLink *)display {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CADisplayLink *)watermarkSettingView:(id)view watermarkTextReplacementDisplayAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementEmitter:(CAEmitterLayer *)emitter {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CAEmitterLayer *)watermarkSettingView:(id)view watermarkTextReplacementEmitterAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementVideo:(AVPlayerLayer *)video {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (AVPlayerLayer *)watermarkSettingView:(id)view watermarkTextReplacementVideoAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementAudio:(AVAudioPlayer *)audio {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (AVAudioPlayer *)watermarkSettingView:(id)view watermarkTextReplacementAudioAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementMedia:(AVPlayerItem *)media {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (AVPlayerItem *)watermarkSettingView:(id)view watermarkTextReplacementMediaAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementAsset:(AVAsset *)asset {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (AVAsset *)watermarkSettingView:(id)view watermarkTextReplacementAssetAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementURL:(NSURL *)url {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSURL *)watermarkSettingView:(id)view watermarkTextReplacementURLAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementData:(NSData *)data {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSData *)watermarkSettingView:(id)view watermarkTextReplacementDataAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementObject:(id)object {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (id)watermarkSettingView:(id)view watermarkTextReplacementObjectAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementValue:(id)value {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (id)watermarkSettingView:(id)view watermarkTextReplacementValueAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementKey:(NSString *)key {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSString *)watermarkSettingView:(id)view watermarkTextReplacementKeyAtIndexPath:(NSIndexPath *)indexPath {
+    return @"";
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementKeys:(NSArray *)keys {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSArray *)watermarkSettingView:(id)view watermarkTextReplacementKeysAtIndexPath:(NSIndexPath *)indexPath {
+    return @[];
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementValues:(NSDictionary *)values {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSDictionary *)watermarkSettingView:(id)view watermarkTextReplacementValuesAtIndexPath:(NSIndexPath *)indexPath {
+    return @{};
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementArray:(NSArray *)array {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSArray *)watermarkSettingView:(id)view watermarkTextReplacementArrayAtIndexPath:(NSIndexPath *)indexPath {
+    return @[];
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementDictionary:(NSDictionary *)dictionary {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSDictionary *)watermarkSettingView:(id)view watermarkTextReplacementDictionaryAtIndexPath:(NSIndexPath *)indexPath {
+    return @{};
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementSet:(NSSet *)set {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSSet *)watermarkSettingView:(id)view watermarkTextReplacementSetAtIndexPath:(NSIndexPath *)indexPath {
+    return [NSSet set];
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementOrderedSet:(NSOrderedSet *)orderedSet {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSOrderedSet *)watermarkSettingView:(id)view watermarkTextReplacementOrderedSetAtIndexPath:(NSIndexPath *)indexPath {
+    return [NSOrderedSet orderedSet];
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementNumber:(NSNumber *)number {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSNumber *)watermarkSettingView:(id)view watermarkTextReplacementNumberAtIndexPath:(NSIndexPath *)indexPath {
+    return @0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementBool:(BOOL)boolean {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (BOOL)watermarkSettingView:(id)view watermarkTextReplacementBoolAtIndexPath:(NSIndexPath *)indexPath {
+    return NO;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementInt:(NSInteger)integer {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSInteger)watermarkSettingView:(id)view watermarkTextReplacementIntAtIndexPath:(NSIndexPath *)indexPath {
+    return 0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementFloat:(CGFloat)floatNumber {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGFloat)watermarkSettingView:(id)view watermarkTextReplacementFloatAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementDouble:(double)doubleNumber {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (double)watermarkSettingView:(id)view watermarkTextReplacementDoubleAtIndexPath:(NSIndexPath *)indexPath {
+    return 0.0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementLong:(long)longNumber {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (long)watermarkSettingView:(id)view watermarkTextReplacementLongAtIndexPath:(NSIndexPath *)indexPath {
+    return 0L;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementLongLong:(long long)longLongNumber {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (long long)watermarkSettingView:(id)view watermarkTextReplacementLongLongAtIndexPath:(NSIndexPath *)indexPath {
+    return 0LL;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUnsignedInt:(NSUInteger)unsignedInt {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSUInteger)watermarkSettingView:(id)view watermarkTextReplacementUnsignedIntAtIndexPath:(NSIndexPath *)indexPath {
+    return 0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUnsignedLong:(unsigned long)unsignedLong {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (unsigned long)watermarkSettingView:(id)view watermarkTextReplacementUnsignedLongAtIndexPath:(NSIndexPath *)indexPath {
+    return 0UL;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUnsignedLongLong:(unsigned long long)unsignedLongLong {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (unsigned long long)watermarkSettingView:(id)view watermarkTextReplacementUnsignedLongLongAtIndexPath:(NSIndexPath *)indexPath {
+    return 0ULL;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementChar:(char)charNumber {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (char)watermarkSettingView:(id)view watermarkTextReplacementCharAtIndexPath:(NSIndexPath *)indexPath {
+    return '\0';
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUnsignedChar:(unsigned char)unsignedChar {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (unsigned char)watermarkSettingView:(id)view watermarkTextReplacementUnsignedCharAtIndexPath:(NSIndexPath *)indexPath {
+    return '\0';
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementShort:(short)shortNumber {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (short)watermarkSettingView:(id)view watermarkTextReplacementShortAtIndexPath:(NSIndexPath *)indexPath {
+    return 0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUnsignedShort:(unsigned short)unsignedShort {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (unsigned short)watermarkSettingView:(id)view watermarkTextReplacementUnsignedShortAtIndexPath:(NSIndexPath *)indexPath {
+    return 0;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementPoint:(CGPoint)point {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGPoint)watermarkSettingView:(id)view watermarkTextReplacementPointAtIndexPath:(NSIndexPath *)indexPath {
+    return CGPointZero;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementSize:(CGSize)size {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGSize)watermarkSettingView:(id)view watermarkTextReplacementSizeAtIndexPath:(NSIndexPath *)indexPath {
+    return CGSizeZero;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementRect:(CGRect)rect {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (CGRect)watermarkSettingView:(id)view watermarkTextReplacementRectAtIndexPath:(NSIndexPath *)indexPath {
+    return CGRectZero;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementEdgeInsets:(UIEdgeInsets)edgeInsets {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIEdgeInsets)watermarkSettingView:(id)view watermarkTextReplacementEdgeInsetsAtIndexPath:(NSIndexPath *)indexPath {
+    return UIEdgeInsetsZero;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementDirection:(UIUserInterfaceLayoutDirection)direction {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIUserInterfaceLayoutDirection)watermarkSettingView:(id)view watermarkTextReplacementDirectionAtIndexPath:(NSIndexPath *)indexPath {
+    return UIUserInterfaceLayoutDirectionLeftToRight;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementLayoutDirection:(NSUserInterfaceLayoutDirection)layoutDirection {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSUserInterfaceLayoutDirection)watermarkSettingView:(id)view watermarkTextReplacementLayoutDirectionAtIndexPath:(NSIndexPath *)indexPath {
+    return NSUserInterfaceLayoutDirectionLeftToRight;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementSemanticContentAttribute:(UISemanticContentAttribute)attribute {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UISemanticContentAttribute)watermarkSettingView:(id)view watermarkTextReplacementSemanticContentAttributeAtIndexPath:(NSIndexPath *)indexPath {
+    return UISemanticContentAttributeUnspecified;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceLayoutDirection:(UIUserInterfaceLayoutDirection)direction {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIUserInterfaceLayoutDirection)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceLayoutDirectionAtIndexPath:(NSIndexPath *)indexPath {
+    return UIUserInterfaceLayoutDirectionLeftToRight;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceLayoutOrientation:(UIUserInterfaceLayoutOrientation)orientation {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIUserInterfaceLayoutOrientation)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceLayoutOrientationAtIndexPath:(NSIndexPath *)indexPath {
+    return UIUserInterfaceLayoutOrientationHorizontal;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceIdiom:(UIUserInterfaceIdiom)idiom {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIUserInterfaceIdiom)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceIdiomAtIndexPath:(NSIndexPath *)indexPath {
+    return UIUserInterfaceIdiomPhone;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceStyle:(UIUserInterfaceStyle)style {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIUserInterfaceStyle)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceStyleAtIndexPath:(NSIndexPath *)indexPath {
+    return UIUserInterfaceStyleUnspecified;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceLevel:(UIUserInterfaceLevel)level {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIUserInterfaceLevel)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceLevelAtIndexPath:(NSIndexPath *)indexPath {
+    return UIUserInterfaceLevelUnspecified;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceSizeCategory:(UIUserInterfaceSizeCategory)sizeCategory {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UIUserInterfaceSizeCategory)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceSizeCategoryAtIndexPath:(NSIndexPath *)indexPath {
+    return UIUserInterfaceSizeCategoryUnspecified;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceTraitCollection:(UITraitCollection *)traitCollection {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UITraitCollection *)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceTraitCollectionAtIndexPath:(NSIndexPath *)indexPath {
+    return [UITraitCollection currentTraitCollection];
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceTrait:(UITrait *)trait {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (UITrait *)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceTraitAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceTraits:(NSSet *)traits {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSSet *)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceTraitsAtIndexPath:(NSIndexPath *)indexPath {
+    return [NSSet set];
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceTraitValue:(id)traitValue {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (id)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceTraitValueAtIndexPath:(NSIndexPath *)indexPath {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceTraitValues:(NSDictionary *)traitValues {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSDictionary *)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceTraitValuesAtIndexPath:(NSIndexPath *)indexPath {
+    return @{};
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceTraitKey:(NSString *)traitKey {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSString *)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceTraitKeyAtIndexPath:(NSIndexPath *)indexPath {
+    return @"";
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceTraitKeys:(NSArray *)traitKeys {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (NSArray *)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceTraitKeysAtIndexPath:(NSIndexPath *)indexPath {
+    return @[];
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceTraitValueForTraitKey:(id)traitValue forTraitKey:(NSString *)traitKey {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (id)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceTraitValueForTraitKeyAtIndexPath:(NSIndexPath *)indexPath forTraitKey:(NSString *)traitKey {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceTraitValueForTraitKeyForced:(id)traitValue forTraitKey:(NSString *)traitKey forced:(BOOL)forced {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (id)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceTraitValueForTraitKeyAtIndexPath:(NSIndexPath *)indexPath forTraitKey:(NSString *)traitKey forced:(BOOL)forced {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceTraitValueForTraitKeyForcedWithCompletion:(id)traitValue forTraitKey:(NSString *)traitKey forced:(BOOL)forced completion:(void (^)(id value))completion {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (id)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceTraitValueForTraitKeyAtIndexPath:(NSIndexPath *)indexPath forTraitKey:(NSString *)traitKey forced:(BOOL)forced completion:(void (^)(id value))completion {
+    return nil;
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDelegate
+
+- (void)watermarkSettingView:(id)view didChangeWatermarkTextReplacementUserInterfaceTraitValueForTraitKeyForcedWithCompletionWithDefault:(id)traitValue forTraitKey:(NSString *)traitKey forced:(BOOL)forced completion:(void (^)(id value))completion defaultValue:(id)defaultValue {
+}
+
+%end
+
+%hook XYNoteBasicNoteEditViewWatermarkSettingViewDataSource
+
+- (id)watermarkSettingView:(id)view watermarkTextReplacementUserInterfaceTraitValueForTraitKeyAtIndexPath:(NSIndexPath *)indexPath forTraitKey:(NSString *)traitKey forced:(BOOL)forced completion:(void (^)(id value))completion defaultValue:(id)defaultValue {
+    return nil;
+}
+
+%end
+
+// 自定义字体 Hook - 使用更简单的方式
+%hook UIFont
+
++ (UIFont *)systemFontOfSize:(CGFloat)size {
+    if (gCustomFontEnabled && gCustomFontName.length > 0) {
+        UIFont *customFont = [UIFont fontWithName:gCustomFontName size:size];
+        if (customFont) {
+            return customFont;
+        }
+    }
     return %orig;
 }
 
-- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    
-    if (indexPath.section == 0 && indexPath.row == 0) {
-        XHSHelperViewController *helperVC = [objc_getClass("XHSHelperViewController") sharedInstance];
-        [self presentViewController:helperVC animated:YES completion:nil];
-        return;
-    }
-    
-    %orig;
-}
-
-%end
-%end
-
-%group LivePhotoProcessing
-%hook XYLivePhotoCache
-
-// 存储LivePhoto到缓存时移除水印
-- (void)storeLivePhoto:(id)livePhoto forKey:(NSString *)key toDisk:(BOOL)toDisk completion:(id)completion {
-    if (gLivePhotoWatermarkEnabled) {
-        NSLog(@"[XHSNOWatermark] 拦截LivePhoto存储: key: %@", key);
-        
-        // 检查livePhoto对象类型
-        NSString *className = NSStringFromClass([livePhoto class]);
-        NSLog(@"[XHSNOWatermark] LivePhoto对象类型: %@", className);
-        
-        // 尝试获取LivePhoto的资源URL
-        if ([livePhoto respondsToSelector:@selector(imageURL)]) {
-            NSURL *imageURL = [livePhoto performSelector:@selector(imageURL)];
-            NSLog(@"[XHSNOWatermark] LivePhoto图片URL: %@", imageURL);
-        }
-        
-        if ([livePhoto respondsToSelector:@selector(videoURL)]) {
-            NSURL *videoURL = [livePhoto performSelector:@selector(videoURL)];
-            NSLog(@"[XHSNOWatermark] LivePhoto视频URL: %@", videoURL);
-            
-            // 如果视频URL包含水印参数，尝试移除
-            if (videoURL && [videoURL.absoluteString containsString:@"watermark"]) {
-                NSString *cleanURLString = [videoURL.absoluteString stringByReplacingOccurrencesOfString:@"watermark=1" withString:@"watermark=0"];
-                cleanURLString = [cleanURLString stringByReplacingOccurrencesOfString:@"&logo=1" withString:@"&logo=0"];
-                NSURL *cleanURL = [NSURL URLWithString:cleanURLString];
-                
-                // 使用KVC设置无水印URL
-                @try {
-                    [livePhoto setValue:cleanURL forKey:@"videoURL"];
-                    NSLog(@"[XHSNOWatermark] 成功移除LivePhoto视频水印URL");
-                } @catch (NSException *e) {
-                    NSLog(@"[XHSNOWatermark] 移除LivePhoto视频水印URL失败: %@", e);
-                }
-            }
-        }
-        
-        // 处理本地文件移除水印
-        if ([livePhoto respondsToSelector:@selector(resourceFileURLs)]) {
-            NSArray *resourceURLs = [livePhoto performSelector:@selector(resourceFileURLs)];
-            NSLog(@"[XHSNOWatermark] LivePhoto资源文件URLs: %@", resourceURLs);
-            
-            // 处理每个资源文件
-            for (NSURL *url in resourceURLs) {
-                if ([url.pathExtension.lowercaseString isEqualToString:@"mov"] ||
-                    [url.pathExtension.lowercaseString isEqualToString:@"mp4"]) {
-                    NSLog(@"[XHSNOWatermark] 处理LivePhoto视频文件: %@", url);
-                    // 这里可以添加视频处理代码移除水印
-                }
-            }
-        }
-    }
-    
-    %orig;
-}
-
-// 从缓存读取LivePhoto时确保无水印
-- (void)livePhotoFromDiskCacheForKey:(NSString *)key completion:(id)completion {
-    if (gLivePhotoWatermarkEnabled && completion) {
-        NSLog(@"[XHSNOWatermark] 读取LivePhoto: key: %@", key);
-        
-        // 创建自定义completion处理器
-        id originalCompletion = completion;
-        id customCompletion = ^(id livePhoto, NSDictionary *info) {
-            if (livePhoto) {
-                NSLog(@"[XHSNOWatermark] 处理缓存中的LivePhoto对象");
-                
-                // 检测水印并尝试移除
-                if ([livePhoto respondsToSelector:@selector(videoURL)]) {
-                    NSURL *videoURL = [livePhoto performSelector:@selector(videoURL)];
-                    if (videoURL && [videoURL.absoluteString containsString:@"watermark"]) {
-                        NSString *cleanURLString = [videoURL.absoluteString stringByReplacingOccurrencesOfString:@"watermark=1" withString:@"watermark=0"];
-                        @try {
-                            [livePhoto setValue:[NSURL URLWithString:cleanURLString] forKey:@"videoURL"];
-                            NSLog(@"[XHSNOWatermark] 成功移除缓存LivePhoto水印");
-                        } @catch (NSException *e) {
-                            NSLog(@"[XHSNOWatermark] 移除缓存LivePhoto水印失败: %@", e);
-                        }
-                    }
-                }
-            }
-            
-            // 调用原始completion
-            ((void (^)(id, NSDictionary *))originalCompletion)(livePhoto, info);
-        };
-        
-        // 使用自定义completion调用原始方法
-        %orig(key, customCompletion);
-        return;
-    }
-    
-    %orig;
-}
-
-// 获取缓存路径并记录信息
-- (NSString *)cachePathForKey:(NSString *)key {
-    NSString *path = %orig;
-    
-    if (gLivePhotoWatermarkEnabled) {
-        // 仅记录实况照片相关的缓存路径
-        if ([path containsString:@"livephoto"] || 
-            [key containsString:@"livephoto"] || 
-            [key containsString:@"live"]) {
-            NSLog(@"[XHSNOWatermark] LivePhoto缓存路径: %@ 对应key: %@", path, key);
-            
-            // 检查文件是否存在
-            NSFileManager *fileManager = [NSFileManager defaultManager];
-            if ([fileManager fileExistsAtPath:path]) {
-                NSDictionary *attrs = [fileManager attributesOfItemAtPath:path error:nil];
-                NSLog(@"[XHSNOWatermark] LivePhoto文件大小: %@ bytes", attrs[NSFileSize]);
-            }
-        }
-    }
-    
-    return path;
-}
-
-// 处理LivePhoto合成操作
-- (void)storeLivePhotoToMemory:(id)livePhoto forKey:(NSString *)key {
-    if (gLivePhotoWatermarkEnabled) {
-        NSLog(@"[XHSNOWatermark] 存储LivePhoto到内存: key: %@", key);
-        // 与storeLivePhoto:forKey:toDisk:completion:类似的水印处理
-    }
-    
-    %orig;
-}
-
-// 检查LivePhoto是否存在
-- (BOOL)diskLivePhotoExistsWithKey:(NSString *)key {
-    BOOL exists = %orig;
-    
-    if (gLivePhotoWatermarkEnabled) {
-        NSLog(@"[XHSNOWatermark] 检查LivePhoto是否存在: key: %@ 结果: %@", key, exists ? @"是" : @"否");
-    }
-    
-    return exists;
-}
-
-%end
-
-%hook PHLivePhoto
-+ (void)requestLivePhotoWithResourceFileURLs:(NSArray<NSURL *> *)fileURLs placeholderImage:(UIImage *)image targetSize:(CGSize)targetSize contentMode:(int)contentMode resultHandler:(id)resultHandler {
-    NSLog(@"[XHSNOWatermark] 系统LivePhoto创建请求: %@", fileURLs);
-    
-    if (fileURLs.count >= 2) {
-        NSLog(@"[XHSNOWatermark] 图片URL: %@", fileURLs[0]);
-        NSLog(@"[XHSNOWatermark] 视频URL: %@", fileURLs[1]);
-    }
-    
-    %orig;
-}
-%end
-
-%end
-
-%group AutoReply
-%end
-
-// Swift桥接类的方法替换实现
-@interface XYChatTableBaseViewModel_Swizzle : NSObject
-@end
-
-@implementation XYChatTableBaseViewModel_Swizzle
-
-+ (void)load {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        Class cls = NSClassFromString(@"XYMessageUIKit.XYChatTableBaseViewModel");
-        if (cls) {
-            SEL originalSelector = @selector(appendMessageAndCellViewModelWith:);
-            SEL swizzledSelector = @selector(xhshelper_appendMessageAndCellViewModelWith:);
-            
-            Method originalMethod = class_getInstanceMethod(cls, originalSelector);
-            Method swizzledMethod = class_getInstanceMethod([self class], swizzledSelector);
-            
-            if (originalMethod && swizzledMethod) {
-                // 将swizzle方法添加到目标类
-                class_addMethod(cls, swizzledSelector, method_getImplementation(swizzledMethod), method_getTypeEncoding(swizzledMethod));
-                // 获取添加后的方法
-                swizzledMethod = class_getInstanceMethod(cls, swizzledSelector);
-                method_exchangeImplementations(originalMethod, swizzledMethod);
-                NSLog(@"[XHSHelper] Swizzled XYChatTableBaseViewModel.appendMessageAndCellViewModelWith:");
-            }
-        }
-    });
-}
-
-- (void)xhshelper_appendMessageAndCellViewModelWith:(id)message {
-    // 调用原始实现
-    [self xhshelper_appendMessageAndCellViewModelWith:message];
-    
-    if (gAutoReplyEnabled) {
-        BOOL isIncomingMessage = NO;
-        
-        if ([message respondsToSelector:@selector(isIncomingMessage)]) {
-            isIncomingMessage = [(NSObject *)message performSelector:@selector(isIncomingMessage)];
-        } else if ([message respondsToSelector:@selector(direction)] && 
-                  [[(NSObject *)message performSelector:@selector(direction)] intValue] == 2) {
-            isIncomingMessage = YES;
-        }
-        
-        if (isIncomingMessage) {
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                NSLog(@"[XHSHelper] 准备发送私信自动回复: %@", gAutoReplyText);
-                
-                if ([self respondsToSelector:@selector(sendTextMessage:)]) {
-                    [self performSelector:@selector(sendTextMessage:) withObject:gAutoReplyText];
-                } else if ([self respondsToSelector:@selector(sendText:)]) {
-                    [self performSelector:@selector(sendText:) withObject:gAutoReplyText];
-                }
-            });
-        }
-    }
-}
-
-@end
-
-@interface CommentService_Swizzle : NSObject
-@end
-
-@implementation CommentService_Swizzle
-
-+ (void)load {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        Class cls = NSClassFromString(@"XYNoteBasic.CommentService");
-        if (cls) {
-            SEL originalSelector = @selector(publishComment:completion:);
-            SEL swizzledSelector = @selector(xhshelper_publishComment:completion:);
-            
-            Method originalMethod = class_getInstanceMethod(cls, originalSelector);
-            Method swizzledMethod = class_getInstanceMethod([self class], swizzledSelector);
-            
-            if (originalMethod && swizzledMethod) {
-                // 将swizzle方法添加到目标类
-                class_addMethod(cls, swizzledSelector, method_getImplementation(swizzledMethod), method_getTypeEncoding(swizzledMethod));
-                // 获取添加后的方法
-                swizzledMethod = class_getInstanceMethod(cls, swizzledSelector);
-                method_exchangeImplementations(originalMethod, swizzledMethod);
-                NSLog(@"[XHSHelper] Swizzled CommentService.publishComment:completion:");
-            }
-        }
-    });
-}
-
-- (void)xhshelper_publishComment:(id)comment completion:(id)completion {
-    // 调用原始实现
-    [self xhshelper_publishComment:comment completion:completion];
-    
-    if (gCommentAutoReplyEnabled) {
-        BOOL isOtherComment = NO;
-        
-        if ([comment respondsToSelector:@selector(isUserComment)] &&
-            ![(NSObject *)comment performSelector:@selector(isUserComment)]) {
-            isOtherComment = YES;
-        } else if ([comment respondsToSelector:@selector(userId)] && 
-                  [comment performSelector:@selector(userId)] != nil) {
-            id currentUserId = nil;
-            if ([NSClassFromString(@"XYUserModel") respondsToSelector:@selector(currentUserId)]) {
-                currentUserId = [NSClassFromString(@"XYUserModel") performSelector:@selector(currentUserId)];
-            }
-            
-            if (currentUserId && ![[comment performSelector:@selector(userId)] isEqual:currentUserId]) {
-                isOtherComment = YES;
-            }
-        }
-        
-        if (isOtherComment) {
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                NSLog(@"[XHSHelper] 准备发送评论自动回复: %@", gCommentAutoReplyText);
-                
-                if ([self respondsToSelector:@selector(replyComment:withContent:completion:)]) {
-                    SEL selector = @selector(replyComment:withContent:completion:);
-                    NSMethodSignature *signature = [self methodSignatureForSelector:selector];
-                    NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
-                    [invocation setTarget:self];
-                    [invocation setSelector:selector];
-                    [invocation setArgument:(void *)&comment atIndex:2];
-                    [invocation setArgument:(void *)&gCommentAutoReplyText atIndex:3];
-                    id nilArg = nil;
-                    [invocation setArgument:(void *)&nilArg atIndex:4];
-                    [invocation invoke];
-                }
-            });
-        }
-    }
-}
-
-@end
-
-// 保存原始方法实现，避免递归
-static IMP originalFontWithNameIMP = NULL;
-
-// 自定义字体Hook
-@interface UIFont_CustomFont : NSObject
-@end
-
-@implementation UIFont_CustomFont
-
-+ (void)load {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        Class cls = [UIFont class];
-        
-        // 保存原始 fontWithName:size: 的实现
-        SEL originalSelector3 = @selector(fontWithName:size:);
-        Method originalMethod3 = class_getClassMethod(cls, originalSelector3);
-        if (originalMethod3) {
-            originalFontWithNameIMP = method_getImplementation(originalMethod3);
-        }
-        
-        // Hook systemFontOfSize:
-        SEL originalSelector1 = @selector(systemFontOfSize:);
-        SEL swizzledSelector1 = @selector(xhshelper_systemFontOfSize:);
-        
-        Method originalMethod1 = class_getClassMethod(cls, originalSelector1);
-        Method swizzledMethod1 = class_getClassMethod([self class], swizzledSelector1);
-        
-        if (originalMethod1 && swizzledMethod1) {
-            method_exchangeImplementations(originalMethod1, swizzledMethod1);
-            NSLog(@"[XHSHelper] Swizzled UIFont.systemFontOfSize:");
-        }
-        
-        // Hook systemFontOfSize:weight:
-        SEL originalSelector2 = @selector(systemFontOfSize:weight:);
-        SEL swizzledSelector2 = @selector(xhshelper_systemFontOfSize:weight:);
-        
-        Method originalMethod2 = class_getClassMethod(cls, originalSelector2);
-        Method swizzledMethod2 = class_getClassMethod([self class], swizzledSelector2);
-        
-        if (originalMethod2 && swizzledMethod2) {
-            method_exchangeImplementations(originalMethod2, swizzledMethod2);
-            NSLog(@"[XHSHelper] Swizzled UIFont.systemFontOfSize:weight:");
-        }
-        
-        // Hook fontWithName:size:
-        SEL swizzledSelector3 = @selector(xhshelper_fontWithName:size:);
-        Method swizzledMethod3 = class_getClassMethod([self class], swizzledSelector3);
-        
-        if (originalMethod3 && swizzledMethod3) {
-            method_exchangeImplementations(originalMethod3, swizzledMethod3);
-            NSLog(@"[XHSHelper] Swizzled UIFont.fontWithName:size:");
-        }
-    });
-}
-
-+ (UIFont *)xhshelper_systemFontOfSize:(CGFloat)size {
-    if (gCustomFontEnabled && gCustomFontName.length > 0 && originalFontWithNameIMP) {
-        // 使用保存的原始方法获取字体，避免递归
-        UIFont *customFont = ((UIFont *(*)(id, SEL, NSString *, CGFloat))originalFontWithNameIMP)([UIFont class], @selector(fontWithName:size:), gCustomFontName, size);
++ (UIFont *)systemFontOfSize:(CGFloat)size weight:(UIFontWeight)weight {
+    if (gCustomFontEnabled && gCustomFontName.length > 0) {
+        UIFont *customFont = [UIFont fontWithName:gCustomFontName size:size];
         if (customFont) {
             return customFont;
         }
     }
-    return [self xhshelper_systemFontOfSize:size];
+    return %orig;
 }
 
-+ (UIFont *)xhshelper_systemFontOfSize:(CGFloat)size weight:(UIFontWeight)weight {
-    if (gCustomFontEnabled && gCustomFontName.length > 0 && originalFontWithNameIMP) {
-        UIFont *customFont = ((UIFont *(*)(id, SEL, NSString *, CGFloat))originalFontWithNameIMP)([UIFont class], @selector(fontWithName:size:), gCustomFontName, size);
-        if (customFont) {
-            return customFont;
++ (UIFont *)fontWithName:(NSString *)fontName size:(CGFloat)size {
+    if (gCustomFontEnabled && gCustomFontName.length > 0) {
+        // 如果请求的字体名称与自定义字体不同，则返回自定义字体
+        if (![fontName isEqualToString:gCustomFontName]) {
+            UIFont *customFont = [UIFont fontWithName:gCustomFontName size:size];
+            if (customFont) {
+                return customFont;
+            }
         }
     }
-    return [self xhshelper_systemFontOfSize:size weight:weight];
+    return %orig(fontName, size);
 }
 
-+ (UIFont *)xhshelper_fontWithName:(NSString *)fontName size:(CGFloat)size {
-    if (gCustomFontEnabled && gCustomFontName.length > 0 && originalFontWithNameIMP) {
-        UIFont *customFont = ((UIFont *(*)(id, SEL, NSString *, CGFloat))originalFontWithNameIMP)([UIFont class], @selector(fontWithName:size:), gCustomFontName, size);
-        if (customFont) {
-            return customFont;
-        }
-    }
-    return [self xhshelper_fontWithName:fontName size:size];
-}
-
-@end
+%end
 
 %ctor {
     @autoreleasepool {
-        NSLog(@"[XHSNOWatermark] Xhs Helper已加载，版本1.0");
+        NSLog(@"[XHSNOWatermark] Xhs Helper 已加载，版本 1.0");
         
         gWatermarkEnabled = YES;
         gSaveEnabled = YES;
@@ -765,60 +2163,11 @@ static IMP originalFontWithNameIMP = NULL;
             gCustomTextRules = [NSMutableDictionary dictionary];
         }
         
-        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        %init(HideTabBarItems);
+        %init(HidePublishButton);
+        %init(HideMessageButton);
+        %init(HideHotButton);
         
-        if ([defaults objectForKey:@"XHSHelperWatermarkEnabled"] != nil) {
-            gWatermarkEnabled = [defaults boolForKey:@"XHSHelperWatermarkEnabled"];
-        }
-        
-        if ([defaults objectForKey:@"XHSHelperSaveEnabled"] != nil) {
-            gSaveEnabled = [defaults boolForKey:@"XHSHelperSaveEnabled"];
-        }
-        
-        if ([defaults objectForKey:@"XHSHelperLivePhotoWatermarkEnabled"] != nil) {
-            gLivePhotoWatermarkEnabled = [defaults boolForKey:@"XHSHelperLivePhotoWatermarkEnabled"];
-        }
-        
-        if ([defaults objectForKey:@"XHSHelperCustomTextEnabled"] != nil) {
-            gCustomTextEnabled = [defaults boolForKey:@"XHSHelperCustomTextEnabled"];
-        }
-        
-        NSDictionary *savedRules = [defaults objectForKey:@"XHSHelperCustomTextRules"];
-        if (savedRules) {
-            gCustomTextRules = [savedRules mutableCopy];
-        }
-        
-        // 初始化自定义字体设置
-        gCustomFontEnabled = NO;
-        gCustomFontName = @"PingFang SC";
-        
-        if ([defaults objectForKey:@"XHSHelperCustomFontEnabled"] != nil) {
-            gCustomFontEnabled = [defaults boolForKey:@"XHSHelperCustomFontEnabled"];
-        }
-        
-        if ([defaults objectForKey:@"XHSHelperCustomFontName"] != nil) {
-            gCustomFontName = [defaults stringForKey:@"XHSHelperCustomFontName"];
-        }
-        
-        [[NSNotificationCenter defaultCenter] addObserverForName:@"XHSHelperTabBarSettingsChanged" 
-                                                        object:nil 
-                                                         queue:[NSOperationQueue mainQueue] 
-                                                    usingBlock:^(NSNotification *note) {
-            NSArray<UIWindow *> *windows = XHSHelperGetAllWindows();
-            for (UIWindow *window in windows) {
-                for (UIView *view in window.subviews) {
-                    if ([view isKindOfClass:NSClassFromString(@"XYTabBar")]) {
-                        [view setNeedsLayout];
-                        [view layoutIfNeeded];
-                    }
-                }
-            }
-        }];
-        
-        %init(VideoProcessing);
-        %init(UICustomization);
-        %init(SettingsMenu);
-        %init(LivePhotoProcessing);
-        %init(AutoReply);
+        %init;
     }
 }
