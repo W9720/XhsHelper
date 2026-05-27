@@ -691,8 +691,8 @@ static XHSHelperViewController *sharedInstance = nil;
 
 - (void)presentFontFilePicker {
     if (@available(iOS 14.0, *)) {
-        NSArray *documentTypes = @[@"public.truetype-font"];
-        UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:documentTypes inMode:UIDocumentPickerModeOpen];
+        NSArray *contentTypes = @[(__bridge NSString *)kUTTypeTrueTypeFont];
+        UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes];
         documentPicker.delegate = self;
         documentPicker.allowsMultipleSelection = NO;
         
@@ -740,19 +740,18 @@ static XHSHelperViewController *sharedInstance = nil;
         // 获取字体名称
         NSData *fontData = [NSData dataWithContentsOfURL:fontURL];
         if (fontData) {
-            CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)fontData);
-            CTFontDescriptorRef fontDescriptor = CTFontManagerCreateFontDescriptorFromDataProvider(provider);
+            CTFontDescriptorRef fontDescriptor = CTFontManagerCreateFontDescriptorFromData((__bridge CFDataRef)fontData, NULL);
             
             if (fontDescriptor) {
                 NSString *fontName = (__bridge_transfer NSString *)CTFontDescriptorCopyAttribute(fontDescriptor, kCTFontNameAttribute);
                 if (fontName) {
                     gCustomFontName = fontName;
                     [self updateWatermarkSettings];
+                    CFRelease(fontDescriptor);
                     return YES;
                 }
                 CFRelease(fontDescriptor);
             }
-            CFRelease(provider);
         }
     }
     
