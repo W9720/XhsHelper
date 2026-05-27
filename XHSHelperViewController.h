@@ -28,3 +28,7 @@ extern BOOL gAutoReplyEnabled;
 extern NSString *gAutoReplyText;
 extern BOOL gCommentAutoReplyEnabled;
 extern NSString *gCommentAutoReplyText;
+
+// 自定义字体功能控制变量
+extern BOOL gCustomFontEnabled;
+extern NSString *gCustomFontName;

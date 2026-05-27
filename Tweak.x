@@ -67,6 +67,10 @@ extern NSString *gAutoReplyText;
 extern BOOL gCommentAutoReplyEnabled;
 extern NSString *gCommentAutoReplyText;
 
+// 自定义字体变量
+extern BOOL gCustomFontEnabled;
+extern NSString *gCustomFontName;
+
 static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
     NSArray<UIWindow *> *windows = nil;
     
@@ -660,6 +664,87 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
 
 @end
 
+// 自定义字体Hook
+@interface UIFont_CustomFont : NSObject
+@end
+
+@implementation UIFont_CustomFont
+
++ (void)load {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        Class cls = [UIFont class];
+        
+        // Hook systemFontOfSize:
+        SEL originalSelector1 = @selector(systemFontOfSize:);
+        SEL swizzledSelector1 = @selector(xhshelper_systemFontOfSize:);
+        
+        Method originalMethod1 = class_getClassMethod(cls, originalSelector1);
+        Method swizzledMethod1 = class_getClassMethod([self class], swizzledSelector1);
+        
+        if (originalMethod1 && swizzledMethod1) {
+            method_exchangeImplementations(originalMethod1, swizzledMethod1);
+            NSLog(@"[XHSHelper] Swizzled UIFont.systemFontOfSize:");
+        }
+        
+        // Hook systemFontOfSize:weight:
+        SEL originalSelector2 = @selector(systemFontOfSize:weight:);
+        SEL swizzledSelector2 = @selector(xhshelper_systemFontOfSize:weight:);
+        
+        Method originalMethod2 = class_getClassMethod(cls, originalSelector2);
+        Method swizzledMethod2 = class_getClassMethod([self class], swizzledSelector2);
+        
+        if (originalMethod2 && swizzledMethod2) {
+            method_exchangeImplementations(originalMethod2, swizzledMethod2);
+            NSLog(@"[XHSHelper] Swizzled UIFont.systemFontOfSize:weight:");
+        }
+        
+        // Hook fontWithName:size:
+        SEL originalSelector3 = @selector(fontWithName:size:);
+        SEL swizzledSelector3 = @selector(xhshelper_fontWithName:size:);
+        
+        Method originalMethod3 = class_getClassMethod(cls, originalSelector3);
+        Method swizzledMethod3 = class_getClassMethod([self class], swizzledSelector3);
+        
+        if (originalMethod3 && swizzledMethod3) {
+            method_exchangeImplementations(originalMethod3, swizzledMethod3);
+            NSLog(@"[XHSHelper] Swizzled UIFont.fontWithName:size:");
+        }
+    });
+}
+
++ (UIFont *)xhshelper_systemFontOfSize:(CGFloat)size {
+    if (gCustomFontEnabled && gCustomFontName.length > 0) {
+        UIFont *customFont = [UIFont fontWithName:gCustomFontName size:size];
+        if (customFont) {
+            return customFont;
+        }
+    }
+    return [self xhshelper_systemFontOfSize:size];
+}
+
++ (UIFont *)xhshelper_systemFontOfSize:(CGFloat)size weight:(UIFontWeight)weight {
+    if (gCustomFontEnabled && gCustomFontName.length > 0) {
+        UIFont *customFont = [UIFont fontWithName:gCustomFontName size:size];
+        if (customFont) {
+            return customFont;
+        }
+    }
+    return [self xhshelper_systemFontOfSize:size weight:weight];
+}
+
++ (UIFont *)xhshelper_fontWithName:(NSString *)fontName size:(CGFloat)size {
+    if (gCustomFontEnabled && gCustomFontName.length > 0) {
+        UIFont *customFont = [UIFont fontWithName:gCustomFontName size:size];
+        if (customFont) {
+            return customFont;
+        }
+    }
+    return [self xhshelper_fontWithName:fontName size:size];
+}
+
+@end
+
 %ctor {
     @autoreleasepool {
         NSLog(@"[XHSNOWatermark] Xhs Helper已加载，版本1.0");
@@ -693,6 +778,18 @@ static NSArray<UIWindow *> *XHSHelperGetAllWindows(void) {
         NSDictionary *savedRules = [defaults objectForKey:@"XHSHelperCustomTextRules"];
         if (savedRules) {
             gCustomTextRules = [savedRules mutableCopy];
+        }
+        
+        // 初始化自定义字体设置
+        gCustomFontEnabled = NO;
+        gCustomFontName = @"PingFang SC";
+        
+        if ([defaults objectForKey:@"XHSHelperCustomFontEnabled"] != nil) {
+            gCustomFontEnabled = [defaults boolForKey:@"XHSHelperCustomFontEnabled"];
+        }
+        
+        if ([defaults objectForKey:@"XHSHelperCustomFontName"] != nil) {
+            gCustomFontName = [defaults stringForKey:@"XHSHelperCustomFontName"];
         }
         
         [[NSNotificationCenter defaultCenter] addObserverForName:@"XHSHelperTabBarSettingsChanged" 

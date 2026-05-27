@@ -9,10 +9,12 @@ BOOL gHideHotButton = NO;
 BOOL gCustomTextEnabled = NO;
 BOOL gLivePhotoWatermarkEnabled = YES;
 BOOL gAutoReplyEnabled = NO;
-NSString *gAutoReplyText = @"感谢私信，我稍后会回复你。"; //错误的后面会修
+NSString *gAutoReplyText = @"感谢私信，我稍后会回复你。";
 BOOL gCommentAutoReplyEnabled = NO;
 NSString *gCommentAutoReplyText = @"感谢评论，已看到。";
 NSMutableDictionary *gCustomTextRules;
+BOOL gCustomFontEnabled = NO;
+NSString *gCustomFontName = @"PingFang SC";
 static XHSHelperViewController *sharedInstance = nil;
 
 @interface XHSHelperViewController () <UITableViewDelegate, UITableViewDataSource>
@@ -23,6 +25,7 @@ static XHSHelperViewController *sharedInstance = nil;
 @property (nonatomic, strong) UISwitch *livePhotoWatermarkSwitch;
 @property (nonatomic, strong) UISwitch *autoReplySwitch;
 @property (nonatomic, strong) UISwitch *commentAutoReplySwitch;
+@property (nonatomic, strong) UISwitch *customFontSwitch;
 @property (nonatomic, strong) NSMutableArray *sectionExpanded;
 @end
 
@@ -51,8 +54,8 @@ static XHSHelperViewController *sharedInstance = nil;
             self.overrideUserInterfaceStyle = UIUserInterfaceStyleLight;
         }
         
-        // 初始化分组展开状态 - 只有2个分组，默认都展开
-        self.sectionExpanded = [NSMutableArray arrayWithObjects:@YES, @YES, nil];
+        // 初始化分组展开状态 - 4个分组，默认都展开
+        self.sectionExpanded = [NSMutableArray arrayWithObjects:@YES, @YES, @YES, @YES, nil];
         
         [self loadUserDefaults];
     }
@@ -92,6 +95,15 @@ static XHSHelperViewController *sharedInstance = nil;
     if ([defaults objectForKey:@"XHSHelperCommentAutoReplyText"] != nil) {
         gCommentAutoReplyText = [defaults stringForKey:@"XHSHelperCommentAutoReplyText"];
     }
+    
+    // 加载自定义字体设置
+    if ([defaults objectForKey:@"XHSHelperCustomFontEnabled"] != nil) {
+        gCustomFontEnabled = [defaults boolForKey:@"XHSHelperCustomFontEnabled"];
+    }
+    
+    if ([defaults objectForKey:@"XHSHelperCustomFontName"] != nil) {
+        gCustomFontName = [defaults stringForKey:@"XHSHelperCustomFontName"];
+    }
 }
 
 
@@ -107,6 +119,10 @@ static XHSHelperViewController *sharedInstance = nil;
     [defaults setObject:gAutoReplyText forKey:@"XHSHelperAutoReplyText"];
     [defaults setBool:gCommentAutoReplyEnabled forKey:@"XHSHelperCommentAutoReplyEnabled"];
     [defaults setObject:gCommentAutoReplyText forKey:@"XHSHelperCommentAutoReplyText"];
+    
+    // 保存自定义字体设置
+    [defaults setBool:gCustomFontEnabled forKey:@"XHSHelperCustomFontEnabled"];
+    [defaults setObject:gCustomFontName forKey:@"XHSHelperCustomFontName"];
     
     [defaults synchronize];
 }
@@ -245,7 +261,7 @@ static XHSHelperViewController *sharedInstance = nil;
 
 #pragma mark - 表格视图数据源和代理
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 3;  // 1.媒体增强功能 2.自动回复功能 3.关于
+    return 4;  // 1.媒体增强功能 2.自定义字体 3.自动回复功能 4.关于
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
@@ -257,6 +273,8 @@ static XHSHelperViewController *sharedInstance = nil;
     if (section == 0) {
         return 3;  // 视频无水印+LivePhoto无水印+强制保存
     } else if (section == 1) {
+        return 1;  // 自定义字体
+    } else if (section == 2) {
         return 2;  // 私信自动回复+评论自动回复
     } else {
         return 1;  // 关于
@@ -280,6 +298,15 @@ static XHSHelperViewController *sharedInstance = nil;
         
         return cell;
     } else if (indexPath.section == 1) {
+        // 自定义字体分组
+        UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"SwitchCell" forIndexPath:indexPath];
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        cell.backgroundColor = [UIColor clearColor];
+        
+        [self configCustomFontCell:cell];
+        
+        return cell;
+    } else if (indexPath.section == 2) {
         UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"SwitchCell" forIndexPath:indexPath];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         cell.backgroundColor = [UIColor clearColor];
@@ -321,6 +348,8 @@ static XHSHelperViewController *sharedInstance = nil;
     if (section == 0) {
         titleLabel.text = @"媒体增强功能";
     } else if (section == 1) {
+        titleLabel.text = @"自定义字体";
+    } else if (section == 2) {
         titleLabel.text = @"自动回复功能";
     } else {
         titleLabel.text = @"关于与支持";
@@ -376,6 +405,8 @@ static XHSHelperViewController *sharedInstance = nil;
     if (section == 0) {
         footerLabel.text = @"移除视频和实况图片水印，允许保存受限制内容";
     } else if (section == 1) {
+        footerLabel.text = @"自定义应用内显示字体";
+    } else if (section == 2) {
         footerLabel.text = @"自动回复私信和评论";
     } else {
         footerLabel.text = @"© 2026 喜爱民谣";
@@ -503,10 +534,34 @@ static XHSHelperViewController *sharedInstance = nil;
     self.commentAutoReplySwitch = commentAutoReplySwitch;
 }
 
+- (void)configCustomFontCell:(UITableViewCell *)cell {
+    // 设置标题和样式
+    cell.textLabel.text = @"自定义字体";
+    cell.textLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
+    
+    // 设置详细描述
+    cell.detailTextLabel.text = [NSString stringWithFormat:@"当前字体: %@", gCustomFontName];
+    
+    // 设置图标
+    if (@available(iOS 13.0, *)) {
+        cell.imageView.image = [UIImage systemImageNamed:@"text.format"];
+        cell.imageView.tintColor = [UIColor systemOrangeColor];
+    }
+    
+    // 添加开关
+    UISwitch *customFontSwitch = [[UISwitch alloc] initWithFrame:CGRectZero];
+    customFontSwitch.on = gCustomFontEnabled;
+    [customFontSwitch addTarget:self action:@selector(customFontSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+    cell.accessoryView = customFontSwitch;
+    self.customFontSwitch = customFontSwitch;
+}
+
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     if (section == 0) {
         return @"媒体增强功能";
     } else if (section == 1) {
+        return @"自定义字体";
+    } else if (section == 2) {
         return @"自动回复功能";
     } else {
         return @"关于与支持";
@@ -517,6 +572,8 @@ static XHSHelperViewController *sharedInstance = nil;
     if (section == 0) {
         return @"移除视频和实况图片水印，允许保存受限制内容";
     } else if (section == 1) {
+        return @"自定义应用内显示字体";
+    } else if (section == 2) {
         return @"自动回复私信和评论";
     } else {
         return @"© 2026 喜爱民谣 保留所有权利";
@@ -526,16 +583,20 @@ static XHSHelperViewController *sharedInstance = nil;
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     
-    // 点击私信自动回复
+    // 点击自定义字体
     if (indexPath.section == 1 && indexPath.row == 0) {
+        [self showCustomFontSettingAlert];
+    }
+    // 点击私信自动回复
+    else if (indexPath.section == 2 && indexPath.row == 0) {
         [self showAutoReplySettingAlert];
     }
     // 点击评论自动回复
-    else if (indexPath.section == 1 && indexPath.row == 1) {
+    else if (indexPath.section == 2 && indexPath.row == 1) {
         [self showCommentAutoReplySettingAlert];
     }
     // 点击关于小红书助手
-    else if (indexPath.section == 2 && indexPath.row == 0) {
+    else if (indexPath.section == 3 && indexPath.row == 0) {
         [self showAboutAlert];
     }
 }
@@ -583,6 +644,36 @@ static XHSHelperViewController *sharedInstance = nil;
     [self updateWatermarkSettings];
 
     [self showToastWithMessage:gCommentAutoReplyEnabled ? @"已开启评论自动回复功能" : @"已关闭评论自动回复功能"];
+}
+
+- (void)customFontSwitchChanged:(UISwitch *)sender {
+    gCustomFontEnabled = sender.isOn;
+    [self updateWatermarkSettings];
+
+    [self showToastWithMessage:gCustomFontEnabled ? @"已开启自定义字体功能" : @"已关闭自定义字体功能"];
+}
+
+- (void)showCustomFontSettingAlert {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"选择字体"
+                                                                   message:@"请选择要使用的字体"
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    
+    NSArray *fontNames = @[@"PingFang SC", @"SF Pro Display", @"Helvetica Neue", @"Arial", @"Georgia", @"Times New Roman"];
+    
+    for (NSString *fontName in fontNames) {
+        UIAlertAction *action = [UIAlertAction actionWithTitle:fontName style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+            gCustomFontName = fontName;
+            [self updateWatermarkSettings];
+            [self.tableView reloadData];
+            [self showToastWithMessage:[NSString stringWithFormat:@"已设置字体: %@", fontName]];
+        }];
+        [alert addAction:action];
+    }
+    
+    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil];
+    [alert addAction:cancelAction];
+    
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)showAboutAlert {
