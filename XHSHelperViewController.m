@@ -691,7 +691,7 @@ static XHSHelperViewController *sharedInstance = nil;
 
 - (void)presentFontFilePicker {
     if (@available(iOS 14.0, *)) {
-        NSArray *contentTypes = @[(__bridge NSString *)kUTTypeTrueTypeFont];
+        NSArray *contentTypes = @[@"public.truetype-font"];
         UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes];
         documentPicker.delegate = self;
         documentPicker.allowsMultipleSelection = NO;
@@ -740,7 +740,7 @@ static XHSHelperViewController *sharedInstance = nil;
         // 获取字体名称
         NSData *fontData = [NSData dataWithContentsOfURL:fontURL];
         if (fontData) {
-            CTFontDescriptorRef fontDescriptor = CTFontManagerCreateFontDescriptorFromData((__bridge CFDataRef)fontData, NULL);
+            CTFontDescriptorRef fontDescriptor = CTFontManagerCreateFontDescriptorFromData((__bridge CFDataRef)fontData);
             
             if (fontDescriptor) {
                 NSString *fontName = (__bridge_transfer NSString *)CTFontDescriptorCopyAttribute(fontDescriptor, kCTFontNameAttribute);
